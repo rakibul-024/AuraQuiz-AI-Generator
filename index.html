@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Generate custom quizzes instantly on any topic using the power of Google Gemini AI. Customizable difficulty, length, and detailed explanations.">
+  <title>AuraQuiz - AI-Powered Quiz Generator</title>
+  
+  <!-- Preconnect and Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <!-- Link custom styles -->
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- Decorative background elements -->
+  <div class="bg-glow bg-glow-1"></div>
+  <div class="bg-glow bg-glow-2"></div>
+  <div class="bg-glow bg-glow-3"></div>
+
+  <!-- Floating ambient particles -->
+  <div class="particles-container" aria-hidden="true">
+    <div class="particle"></div>
+    <div class="particle"></div>
+    <div class="particle"></div>
+    <div class="particle"></div>
+    <div class="particle"></div>
+    <div class="particle"></div>
+  </div>
+
+  <div class="app-container">
+    <!-- App Header -->
+    <header class="app-header">
+      <div class="logo-area" id="logo-area" style="cursor: pointer;">
+        <svg class="logo-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+        </svg>
+        <h1 class="logo-text">Aura<span>Quiz</span></h1>
+      </div>
+      <div class="header-actions">
+        <button id="btn-theme-toggle" class="btn-theme-toggle" title="Toggle Theme" aria-label="Toggle light and dark theme">
+          <svg id="theme-icon-sun" class="hidden" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="5"></circle>
+            <line x1="12" y1="1" x2="12" y2="3"></line>
+            <line x1="12" y1="21" x2="12" y2="23"></line>
+            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+            <line x1="1" y1="12" x2="3" y2="12"></line>
+            <line x1="21" y1="12" x2="23" y2="12"></line>
+            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+          </svg>
+          <svg id="theme-icon-moon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+          </svg>
+        </button>
+        <button id="btn-change-key" class="btn btn-secondary hidden" title="Change Developer Access Token">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>
+          Access Token
+        </button>
+      </div>
+    </header>
+
+    <main class="app-main">
+      <!-- 1. API Key Setup Screen -->
+      <section id="screen-setup" class="screen">
+        <div class="setup-container centered-container">
+          <div class="card card-setup glass-card">
+            <div class="card-header">
+              <div class="card-icon-wrapper">
+                <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+                </svg>
+              </div>
+              <h2>AuraQuiz Setup</h2>
+              <p class="subtitle">Enter your developer access token to synthesize customized interactive quizzes. Your token is stored locally in your browser's storage.</p>
+            </div>
+            
+            <form id="form-api-key" class="card-body">
+              <div class="input-group">
+                <label for="input-api-key">Developer Access Token</label>
+                <div class="password-input-wrapper">
+                  <input type="text" id="input-api-key" class="masked-api-key" placeholder="Enter access token..." required autocomplete="off">
+                </div>
+                <small class="helper-text">
+                  Provide a valid developer token/key to enable the AI quiz generation functionality.
+                </small>
+              </div>
+
+              <div id="setup-feedback" class="feedback-message hidden"></div>
+
+              <button type="submit" id="btn-submit-key" class="btn btn-primary btn-block">
+                <span>Save Token & Continue</span>
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+              </button>
+            </form>
+          </div>
+        </div>
+      </section>
+
+      <!-- 2. Generator Dashboard Screen -->
+      <section id="screen-dashboard" class="screen">
+        <div class="dashboard-container centered-container">
+          <div class="card glass-card card-config">
+            <div class="card-header">
+              <h2>Quiz Crafting Panel</h2>
+              <p class="subtitle">Tune your specifications to let Gemini synthesize custom questions.</p>
+            </div>
+
+            <form id="form-quiz-config" class="card-body">
+              <!-- Topic Input -->
+              <div class="input-group">
+                <label for="input-topic">Topic or Subject</label>
+                <div class="input-with-icon">
+                  <svg class="input-icon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                  <input type="text" id="input-topic" placeholder="e.g., Quantum Mechanics, JavaScript Closures, WWII History" required>
+                </div>
+                <!-- Suggestions Chips -->
+                <div class="suggestions-container">
+                  <span class="suggestion-chip">JavaScript Basics</span>
+                  <span class="suggestion-chip">World History</span>
+                  <span class="suggestion-chip">Human Anatomy</span>
+                  <span class="suggestion-chip">Space Astronomy</span>
+                </div>
+              </div>
+
+              <!-- Row Grid for Configuration -->
+              <div class="form-row">
+                <!-- Difficulty Selection -->
+                <div class="input-group flex-1">
+                  <label for="select-difficulty">Difficulty Level</label>
+                  <select id="select-difficulty">
+                    <option value="Easy">Easy</option>
+                    <option value="Medium" selected>Medium</option>
+                    <option value="Hard">Hard</option>
+                    <option value="Expert">Expert</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="form-row">
+                <!-- Question Count Select -->
+                <div class="input-group flex-1">
+                  <label for="select-count">Number of Questions</label>
+                  <select id="select-count">
+                    <option value="5">5 Questions</option>
+                    <option value="10" selected>10 Questions</option>
+                    <option value="15">15 Questions</option>
+                    <option value="20">20 Questions</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="form-row">
+                <!-- Quiz Style / Mode selection -->
+                <div class="input-group flex-1">
+                  <label for="select-style">Quiz Tone / Tone Style</label>
+                  <select id="select-style">
+                    <option value="Standard Academic">Standard Academic</option>
+                    <option value="Casual & Gamified">Casual & Gamified</option>
+                    <option value="Professional / Technical Interview">Technical Interview</option>
+                    <option value="Cryptic & Riddle-like">Cryptic & Riddle-like</option>
+                  </select>
+                </div>
+              </div>
+
+              <button type="submit" id="btn-generate" class="btn btn-primary btn-block glow-button">
+                <svg class="btn-sparkle" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+                </svg>
+                <span>Synthesize Quiz</span>
+              </button>
+            </form>
+          </div>
+        </div>
+      </section>
+
+      <!-- 3. Dynamic Loading Screen -->
+      <section id="screen-loading" class="screen">
+        <div class="card loading-card glass-card">
+          <div class="loading-animation-container">
+            <div class="pulse-ring"></div>
+            <div class="pulsing-brain">
+              <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96-.44 2.5 2.5 0 0 1 0-3.12 3 3 0 0 1 0-4.88 2.5 2.5 0 0 1 0-3.12A2.5 2.5 0 0 1 9.5 2z"/>
+                <path d="M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96-.44 2.5 2.5 0 0 0 0-3.12 3 3 0 0 0 0-4.88 2.5 2.5 0 0 0 0-3.12A2.5 2.5 0 0 0 14.5 2z"/>
+              </svg>
+            </div>
+          </div>
+          <h2 class="loader-title">Synthesizing Questions</h2>
+          <p id="loader-status-text" class="loader-status">Consulting Gemini knowledge base...</p>
+          <div class="progress-bar-flat-container">
+            <div id="loader-progress-bar" class="progress-bar-flat-fill"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 4. Active Quiz Gameplay Screen -->
+      <section id="screen-quiz" class="screen">
+        <div class="quiz-container centered-container">
+          <!-- Quiz Top Header / Meta -->
+          <div class="quiz-header-bar glass-card">
+            <div class="meta-item">
+              <span class="meta-label">Topic:</span>
+              <span id="quiz-meta-topic" class="meta-value">JavaScript</span>
+            </div>
+            
+            <!-- Dial Timer integrated in header -->
+            <div class="timer-badge">
+              <svg viewBox="0 0 36 36" class="timer-ring-svg">
+                <circle class="timer-ring-bg" cx="18" cy="18" r="16"></circle>
+                <circle id="timer-dial-fill" class="timer-ring-fill" cx="18" cy="18" r="16" stroke-dasharray="100, 100"></circle>
+              </svg>
+              <span id="quiz-timer" class="timer-value">45s</span>
+            </div>
+          </div>
+
+          <!-- Question Card -->
+          <div class="card question-card glass-card">
+            <!-- Progress details inside card -->
+            <div class="progress-details">
+              <div class="progress-info">
+                <span class="progress-count">Question <strong id="current-question-num">1</strong> of <span id="total-questions-count">10</span></span>
+                <span id="progress-percent-label" class="progress-percent">10%</span>
+              </div>
+              <div class="progress-bar-container">
+                <div id="quiz-progress-fill" class="progress-bar-fill" style="width: 10%"></div>
+              </div>
+            </div>
+
+            <div id="quiz-question-text" class="question-text">
+              What is the output of `typeof null` in JavaScript?
+            </div>
+
+            <!-- Choice items wrapper -->
+            <div id="quiz-options-container" class="options-grid">
+              <!-- Dynamically populated options -->
+            </div>
+          </div>
+
+          <!-- Navigation Controls -->
+          <div class="quiz-controls">
+            <button id="btn-prev-question" class="btn btn-secondary flex-center" disabled>
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+              <span>Back</span>
+            </button>
+            <button id="btn-next-question" class="btn btn-primary flex-center">
+              <span>Next</span>
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- 5. Quiz Results & Analytics Screen -->
+      <section id="screen-results" class="screen">
+        <div class="results-container centered-container">
+          <!-- Score summary card -->
+          <div class="card glass-card results-summary-card">
+            <div class="results-hero">
+              <div class="circular-chart-wrapper">
+                <svg viewBox="0 0 36 36" class="circular-chart">
+                  <path class="circle-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                  <path id="score-circle" class="circle" stroke-dasharray="0, 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                </svg>
+                <div class="chart-text-overlay">
+                  <span id="results-score-percent" class="percent">0%</span>
+                  <span class="label">Correct</span>
+                </div>
+              </div>
+
+              <div class="score-meta">
+                <h2 id="results-feedback-title">Superb Effort!</h2>
+                <p class="subtitle">You completed the quiz in <span id="results-time-taken">1m 42s</span>.</p>
+                <div class="stats-row">
+                  <div class="stat-box">
+                    <span class="stat-val" id="results-stat-score">0/0</span>
+                    <span class="stat-lbl">Score</span>
+                  </div>
+                  <div class="stat-box">
+                    <span class="stat-val text-success" id="results-stat-correct">0</span>
+                    <span class="stat-lbl">Correct</span>
+                  </div>
+                  <div class="stat-box">
+                    <span class="stat-val text-danger" id="results-stat-incorrect">0</span>
+                    <span class="stat-lbl">Wrong</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="results-actions">
+              <button id="btn-restart-quiz" class="btn btn-secondary flex-center">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+                <span>Retry Quiz</span>
+              </button>
+              <button id="btn-new-quiz" class="btn btn-primary flex-center">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+                <span>Create New Quiz</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Detailed Review List -->
+          <div class="results-review-section">
+            <h3 class="section-title">Review Solutions</h3>
+            <div id="results-review-list" class="review-list-container">
+              <!-- Dynamically populated detailed analysis items -->
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- App Footer -->
+    <footer class="app-footer"></footer>
+  </div>
+
+  <!-- Main JavaScript App code -->
+  <script src="app.js"></script>
+</body>
+</html>
