@@ -560,6 +560,12 @@ select:focus {
   color: var(--danger-color);
 }
 
+.btn-retry-service {
+  align-self: flex-start;
+  padding: 8px 12px;
+  font-size: 13px;
+}
+
 /* Suggestion Chips */
 .suggestions-container {
   display: flex;

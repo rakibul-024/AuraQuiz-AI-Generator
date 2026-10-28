@@ -5,7 +5,6 @@
 
 // --- Global Application State ---
 const state = {
-  apiKey: '',
   availableModels: [],
   selectedModel: localStorage.getItem('aura_quiz_gemini_model') || '',
   currentScreen: 'screen-dashboard',
@@ -33,12 +32,8 @@ const DOM = {
   // Header Elements
   btnChangeKey: document.getElementById('btn-change-key'),
 
-  // Setup Screen
-  formApiKey: document.getElementById('form-api-key'),
-  inputApiKey: document.getElementById('input-api-key'),
-  setupFeedback: document.getElementById('setup-feedback'),
-  btnSubmitKey: document.getElementById('btn-submit-key'),
-  btnContinueWithoutKey: document.getElementById('btn-continue-without-key'),
+  // AI Service Information
+  btnContinueToDashboard: document.getElementById('btn-continue-to-dashboard'),
 
   // Dashboard Screen
   formQuizConfig: document.getElementById('form-quiz-config'),
@@ -50,6 +45,7 @@ const DOM = {
   selectModel: document.getElementById('select-model'),
   modelStatus: document.getElementById('model-status'),
   btnRefreshModels: document.getElementById('btn-refresh-models'),
+  btnRetryService: document.getElementById('btn-retry-service'),
   btnGenerate: document.getElementById('btn-generate'),
 
   // Loading Screen
@@ -83,19 +79,18 @@ const DOM = {
 
 // --- Initialization ---
 document.addEventListener('DOMContentLoaded', () => {
-  const savedKey = localStorage.getItem('aura_quiz_gemini_key') || '';
-  state.apiKey = savedKey;
+  localStorage.removeItem('aura_quiz_gemini_key');
   document.getElementById('copyright-year').textContent = new Date().getFullYear();
 
   setupEventListeners();
   initTheme();
   checkInitialState();
-  if (state.apiKey) {
-    showModelStatus('Loading the latest available Gemini models...', 'info');
-    refreshGeminiModels().catch(err => {
-      showModelStatus(err.message, 'error');
-    });
-  }
+  showModelStatus('Connecting to the shared AI service...', 'info');
+  refreshGeminiModels().then(() => {
+    showModelStatus(`Loaded ${state.availableModels.length} available Gemini models.`, 'success');
+  }).catch(err => {
+    showModelStatus(err.message, 'error');
+  });
 });
 
 // --- Theme Management ---
@@ -143,9 +138,6 @@ function showScreen(screenId) {
 }
 
 function checkInitialState() {
-  if (DOM.inputApiKey) {
-    DOM.inputApiKey.value = state.apiKey;
-  }
   renderModelOptions();
   showScreen('screen-dashboard');
 }
@@ -188,38 +180,7 @@ function setupEventListeners() {
     });
   }
 
-  // AI setup is optional; the dashboard is accessible without a key.
-  DOM.formApiKey.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const key = DOM.inputApiKey.value.trim();
-    if (!key) {
-      showScreen('screen-dashboard');
-      return;
-    }
-
-    setSetupLoading(true);
-    showFeedback('Checking the key and loading available Gemini models...', 'info');
-    try {
-      const models = await fetchAvailableGeminiModels(key);
-      state.apiKey = key;
-      state.availableModels = models;
-      localStorage.setItem('aura_quiz_gemini_key', key);
-      renderModelOptions();
-      showFeedback('AI key saved and available models loaded.', 'success');
-      showModelStatus(`Loaded ${models.length} available Gemini models.`, 'success');
-      setTimeout(() => {
-        DOM.setupFeedback.classList.add('hidden');
-        showScreen('screen-dashboard');
-      }, 700);
-    } catch (err) {
-      showFeedback(err.message, 'error');
-    } finally {
-      setSetupLoading(false);
-    }
-  });
-
-  DOM.btnContinueWithoutKey.addEventListener('click', () => {
-    DOM.setupFeedback.classList.add('hidden');
+  DOM.btnContinueToDashboard.addEventListener('click', () => {
     showScreen('screen-dashboard');
   });
 
@@ -231,9 +192,6 @@ function setupEventListeners() {
       }
       stopTimer();
     }
-    if (DOM.inputApiKey) {
-      DOM.inputApiKey.value = state.apiKey;
-    }
     showScreen('screen-setup');
   });
 
@@ -242,13 +200,13 @@ function setupEventListeners() {
     localStorage.setItem('aura_quiz_gemini_model', state.selectedModel);
   });
 
+  DOM.btnRetryService.addEventListener('click', () => {
+    DOM.btnRefreshModels.click();
+  });
+
   DOM.btnRefreshModels.addEventListener('click', async () => {
-    if (!state.apiKey) {
-      showModelStatus('Add an AI key in AI Settings before refreshing models.', 'error');
-      return;
-    }
     DOM.btnRefreshModels.disabled = true;
-    showModelStatus('Checking for newly available Gemini models...', 'info');
+    showModelStatus('Checking for the latest available models...', 'info');
     try {
       await refreshGeminiModels();
       showModelStatus(`Model list updated (${state.availableModels.length} available).`, 'success');
@@ -276,9 +234,8 @@ function setupEventListeners() {
     const style = DOM.selectStyle.value;
 
     if (!topic) return;
-    if (!state.apiKey) {
-      showFeedback('A Gemini API key is needed to generate quizzes. You can still use the app without signing in.', 'error');
-      showScreen('screen-setup');
+    if (!state.availableModels.length) {
+      showModelStatus('The shared AI service is unavailable. Try refreshing the model list.', 'error');
       return;
     }
 
@@ -299,6 +256,7 @@ function setupEventListeners() {
       console.error(err);
       stopLoaderSimulation();
       showScreen('screen-dashboard');
+      showModelStatus(err.message || 'Quiz generation failed. Check your connection and AI settings.', 'error');
       alert(`Generation Failed: ${err.message || 'Please check your connection and try again.'}`);
     }
   });
@@ -341,34 +299,34 @@ function setupEventListeners() {
 }
 
 // --- Gemini Model Discovery & Setup Helpers ---
-async function fetchAvailableGeminiModels(key) {
-  const url = new URL('https://generativelanguage.googleapis.com/v1beta/models');
-  url.searchParams.set('key', key);
-  const response = await fetch(url);
-  const data = await response.json();
+async function fetchAvailableGeminiModels() {
+  const response = await fetch('/api/models');
+  const data = await response.json().catch(() => null);
   if (!response.ok) {
-    throw new Error(data.error?.message || `Could not load models (HTTP ${response.status}). Check the API key and try again.`);
+    throw new Error(data?.error || 'AI service endpoint unavailable. Deploy this app to Vercel and configure its server-side key.');
   }
 
-  const models = (data.models || [])
-    .filter(model => model.supportedGenerationMethods?.includes('generateContent'))
-    .map(model => ({
-      name: model.name.replace(/^models\//, ''),
-      displayName: model.displayName || model.name.replace(/^models\//, '')
-    }))
+  const models = (data?.models || [])
+    .filter(model => model.name && model.displayName)
     .sort((a, b) => a.displayName.localeCompare(b.displayName));
 
   if (!models.length) {
-    throw new Error('This API key has no Gemini models that support content generation.');
+    throw new Error('The shared AI service has no models available for quiz generation.');
   }
   return models;
 }
 
 async function refreshGeminiModels() {
-  const models = await fetchAvailableGeminiModels(state.apiKey);
-  state.availableModels = models;
-  renderModelOptions();
-  return models;
+  try {
+    const models = await fetchAvailableGeminiModels();
+    state.availableModels = models;
+    renderModelOptions();
+    return models;
+  } catch (err) {
+    state.availableModels = [];
+    renderModelOptions();
+    throw err;
+  }
 }
 
 function renderModelOptions() {
@@ -394,7 +352,7 @@ function renderModelOptions() {
   } else {
     const option = document.createElement('option');
     option.value = '';
-    option.textContent = state.apiKey ? 'Loading available models...' : 'Add an AI key to load models';
+    option.textContent = 'Connecting to the shared AI service...';
     DOM.selectModel.appendChild(option);
     DOM.selectModel.disabled = true;
   }
@@ -406,38 +364,16 @@ function showModelStatus(message, type) {
     DOM.modelStatus.dataset.state = type;
   }
 
+  if (DOM.btnRetryService) {
+    DOM.btnRetryService.classList.toggle('hidden', type !== 'error');
+  }
+
   if (type === 'error' && !state.availableModels.length && DOM.selectModel) {
     const option = document.createElement('option');
     option.value = '';
-    option.textContent = state.apiKey ? 'Could not load models — check AI Settings' : 'Add an AI key to load models';
+    option.textContent = 'AI service unavailable — check deployment settings';
     DOM.selectModel.replaceChildren(option);
     DOM.selectModel.disabled = true;
-  }
-}
-
-function showFeedback(message, type) {
-  if (DOM.setupFeedback) {
-    DOM.setupFeedback.textContent = message;
-    DOM.setupFeedback.className = `feedback-message feedback-${type}`;
-    DOM.setupFeedback.classList.remove('hidden');
-  }
-}
-
-function setSetupLoading(isLoading) {
-  if (DOM.btnSubmitKey && DOM.inputApiKey) {
-    DOM.btnSubmitKey.disabled = isLoading;
-    DOM.inputApiKey.disabled = isLoading;
-    const btnText = DOM.btnSubmitKey.querySelector('span');
-    if (btnText) {
-      if (isLoading) {
-        btnText.textContent = 'Checking key and models...';
-      } else {
-        btnText.textContent = 'Save AI Key & Continue';
-      }
-    }
-    if (DOM.btnContinueWithoutKey) {
-      DOM.btnContinueWithoutKey.disabled = isLoading;
-    }
   }
 }
 
@@ -483,64 +419,13 @@ function stopLoaderSimulation() {
 
 // --- Gemini Content Fetcher ---
 async function fetchQuizFromGemini(topic, difficulty, count, style) {
-  const apiKey = state.apiKey;
   const models = [
     state.selectedModel,
     ...state.availableModels.map(model => model.name)
   ].filter((model, index, list) => model && list.indexOf(model) === index);
   if (!models.length) {
-    throw new Error('No Gemini models are available. Refresh the model list in AI Settings.');
+    throw new Error('No Gemini models are available. Refresh the model list and try again.');
   }
-
-  const systemPrompt = `You are an expert educator and quiz builder. 
-Create a customized, comprehensive quiz about "${topic}" matching the following settings:
-- Difficulty: ${difficulty}
-- Total Questions: ${count}
-- Tone/Style: ${style}
-
-IMPORTANT REQUIREMENT:
-- Generate unique multiple-choice questions.
-- Each question must have exactly 4 options.
-- Choose clear distractors and exactly one clearly correct answer.
-- Provide a detailed and friendly explanation for each question explaining why the correct answer is right and why other options are incorrect.
-- Ensure the correctAnswer is one of the choices exactly as spelled.`;
-
-  const requestBody = {
-    contents: [
-      {
-        role: 'user',
-        parts: [{ text: systemPrompt }]
-      }
-    ],
-    generationConfig: {
-      responseMimeType: 'application/json',
-      responseSchema: {
-        type: 'OBJECT',
-        properties: {
-          title: { type: 'STRING' },
-          questions: {
-            type: 'ARRAY',
-            description: `List of exactly ${count} quiz questions`,
-            items: {
-              type: 'OBJECT',
-              properties: {
-                question: { type: 'STRING' },
-                options: {
-                  type: 'ARRAY',
-                  items: { type: 'STRING' },
-                  description: 'Exactly 4 distinct answers for the question'
-                },
-                correctAnswer: { type: 'STRING', description: 'The exact string representation of the correct answer option' },
-                explanation: { type: 'STRING', description: 'A detailed breakdown explanation of the concept' }
-              },
-              required: ['question', 'options', 'correctAnswer', 'explanation']
-            }
-          }
-        },
-        required: ['title', 'questions']
-      }
-    }
-  };
 
   let lastError = null;
 
@@ -549,30 +434,28 @@ IMPORTANT REQUIREMENT:
       if (DOM.loaderStatusText) {
         DOM.loaderStatusText.textContent = `Connecting via ${model}...`;
       }
-      const url = new URL(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`);
-      url.searchParams.set('key', apiKey);
-      const response = await fetch(url, {
+      const response = await fetch('/api/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(requestBody)
+        body: JSON.stringify({ model, topic, difficulty, count, style })
       });
+      const data = await response.json().catch(() => null);
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        const errMsg = errorData.error?.message || `HTTP ${response.status}`;
+        const errMsg = data?.error || `AI service returned HTTP ${response.status}.`;
         console.warn(`[${model}] failed: ${errMsg}`);
         lastError = new Error(errMsg);
+        if (response.status !== 404 && response.status !== 429 && response.status < 500) {
+          break;
+        }
         continue; // try next model
       }
 
-      const data = await response.json();
-      const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text;
-      if (!rawText) {
-        lastError = new Error(`No content returned by ${model}.`);
+      if (!data?.quiz || !Array.isArray(data.quiz.questions)) {
+        lastError = new Error(`The shared AI service returned an invalid quiz for ${model}.`);
         continue;
       }
-
-      return JSON.parse(cleanJSONString(rawText));
+      return data.quiz;
 
     } catch (err) {
       console.warn(`[${model}] exception:`, err.message);
@@ -581,16 +464,7 @@ IMPORTANT REQUIREMENT:
     }
   }
 
-  throw lastError || new Error('All available Gemini models failed. Check your API key and quota at https://aistudio.google.com/');
-}
-
-function cleanJSONString(rawText) {
-  let text = rawText.trim();
-  if (text.startsWith('```')) {
-    text = text.replace(/^```(json)?\s*/i, '');
-    text = text.replace(/\s*```$/, '');
-  }
-  return text.trim();
+  throw lastError || new Error('All available Gemini models failed. Please try again later.');
 }
 
 // --- Quiz Gameplay Implementation ---
