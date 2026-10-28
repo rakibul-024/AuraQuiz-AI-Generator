@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="Generate custom quizzes instantly on any topic using the power of Google Gemini AI. Customizable difficulty, length, and detailed explanations.">
+  <meta name="description" content="Generate custom quizzes with your choice of available Google Gemini AI models.">
   <title>AuraQuiz - AI-Powered Quiz Generator</title>
   
   <!-- Preconnect and Google Fonts -->
@@ -56,9 +56,9 @@
             <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
           </svg>
         </button>
-        <button id="btn-change-key" class="btn btn-secondary hidden" title="Change Developer Access Token">
+        <button id="btn-change-key" class="btn btn-secondary hidden" title="Configure AI settings">
           <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>
-          Access Token
+          AI Settings
         </button>
       </div>
     </header>
@@ -74,26 +74,29 @@
                   <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
                 </svg>
               </div>
-              <h2>AuraQuiz Setup</h2>
-              <p class="subtitle">Enter your developer access token to synthesize customized interactive quizzes. Your token is stored locally in your browser's storage.</p>
+              <h2>AI Settings</h2>
+              <p class="subtitle">Sign-in is not required. Add your own Google Gemini API key only when you want to generate quizzes. The key stays in this browser.</p>
             </div>
             
             <form id="form-api-key" class="card-body">
               <div class="input-group">
-                <label for="input-api-key">Developer Access Token</label>
+                <label for="input-api-key">Google Gemini API Key (optional)</label>
                 <div class="password-input-wrapper">
-                  <input type="text" id="input-api-key" class="masked-api-key" placeholder="Enter access token..." required autocomplete="off">
+                  <input type="password" id="input-api-key" class="masked-api-key" placeholder="Paste your Gemini API key..." autocomplete="off">
                 </div>
                 <small class="helper-text">
-                  Provide a valid developer token/key to enable the AI quiz generation functionality.
+                  Get a key from <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer">Google AI Studio</a>. A key is only needed for AI quiz generation.
                 </small>
               </div>
 
               <div id="setup-feedback" class="feedback-message hidden"></div>
 
               <button type="submit" id="btn-submit-key" class="btn btn-primary btn-block">
-                <span>Save Token & Continue</span>
+                <span>Save AI Key & Continue</span>
                 <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+              </button>
+              <button type="button" id="btn-continue-without-key" class="btn btn-secondary btn-block">
+                Continue without an AI key
               </button>
             </form>
           </div>
@@ -110,6 +113,17 @@
             </div>
 
             <form id="form-quiz-config" class="card-body">
+              <div class="input-group">
+                <label for="select-model">AI Model</label>
+                <div class="form-row model-select-row">
+                  <select id="select-model" aria-describedby="model-status" disabled>
+                    <option value="">Add an AI key to load models</option>
+                  </select>
+                  <button type="button" id="btn-refresh-models" class="btn btn-secondary" aria-label="Refresh available Gemini models">Refresh</button>
+                </div>
+                <small id="model-status" class="model-status" data-state="info">Add an AI key in AI Settings to load the latest available models.</small>
+              </div>
+
               <!-- Topic Input -->
               <div class="input-group">
                 <label for="input-topic">Topic or Subject</label>
@@ -315,7 +329,7 @@
     </main>
 
     <!-- App Footer -->
-    <footer class="app-footer"></footer>
+    <footer class="app-footer">© <span id="copyright-year"></span> Rakibul Islam. All rights reserved.</footer>
   </div>
 
   <!-- Main JavaScript App code -->

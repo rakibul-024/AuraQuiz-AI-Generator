@@ -1,11 +1,13 @@
 /**
  * AuraQuiz - Application Logic Controller
- * Uses Google Gemini 2.5 Flash for serverless quiz generation.
+ * Uses the user's selected Google Gemini model for quiz generation.
  */
 
 // --- Global Application State ---
 const state = {
   apiKey: '',
+  availableModels: [],
+  selectedModel: localStorage.getItem('aura_quiz_gemini_model') || '',
   currentScreen: 'screen-dashboard',
   quizData: null,
   currentQuestionIndex: 0,
@@ -36,6 +38,7 @@ const DOM = {
   inputApiKey: document.getElementById('input-api-key'),
   setupFeedback: document.getElementById('setup-feedback'),
   btnSubmitKey: document.getElementById('btn-submit-key'),
+  btnContinueWithoutKey: document.getElementById('btn-continue-without-key'),
 
   // Dashboard Screen
   formQuizConfig: document.getElementById('form-quiz-config'),
@@ -44,6 +47,9 @@ const DOM = {
   selectDifficulty: document.getElementById('select-difficulty'),
   selectCount: document.getElementById('select-count'),
   selectStyle: document.getElementById('select-style'),
+  selectModel: document.getElementById('select-model'),
+  modelStatus: document.getElementById('model-status'),
+  btnRefreshModels: document.getElementById('btn-refresh-models'),
   btnGenerate: document.getElementById('btn-generate'),
 
   // Loading Screen
@@ -79,10 +85,17 @@ const DOM = {
 document.addEventListener('DOMContentLoaded', () => {
   const savedKey = localStorage.getItem('aura_quiz_gemini_key') || '';
   state.apiKey = savedKey;
+  document.getElementById('copyright-year').textContent = new Date().getFullYear();
 
   setupEventListeners();
   initTheme();
   checkInitialState();
+  if (state.apiKey) {
+    showModelStatus('Loading the latest available Gemini models...', 'info');
+    refreshGeminiModels().catch(err => {
+      showModelStatus(err.message, 'error');
+    });
+  }
 });
 
 // --- Theme Management ---
@@ -130,14 +143,11 @@ function showScreen(screenId) {
 }
 
 function checkInitialState() {
-  if (state.apiKey) {
-    if (DOM.inputApiKey) {
-      DOM.inputApiKey.value = state.apiKey;
-    }
-    showScreen('screen-dashboard');
-  } else {
-    showScreen('screen-setup');
+  if (DOM.inputApiKey) {
+    DOM.inputApiKey.value = state.apiKey;
   }
+  renderModelOptions();
+  showScreen('screen-dashboard');
 }
 
 // --- Event Listeners Setup ---
@@ -178,43 +188,75 @@ function setupEventListeners() {
     });
   }
 
-  // API Key Submission
+  // AI setup is optional; the dashboard is accessible without a key.
   DOM.formApiKey.addEventListener('submit', async (e) => {
     e.preventDefault();
     const key = DOM.inputApiKey.value.trim();
-    if (!key) return;
+    if (!key) {
+      showScreen('screen-dashboard');
+      return;
+    }
 
-    // Show verification indicator
     setSetupLoading(true);
-    showFeedback('Verifying developer access token...', 'info');
-
-    const isValid = await verifyGeminiKey(key);
-
-    setSetupLoading(false);
-    if (isValid) {
+    showFeedback('Checking the key and loading available Gemini models...', 'info');
+    try {
+      const models = await fetchAvailableGeminiModels(key);
       state.apiKey = key;
+      state.availableModels = models;
       localStorage.setItem('aura_quiz_gemini_key', key);
-      showFeedback('Access token verified successfully! Loading Dashboard...', 'success');
-
+      renderModelOptions();
+      showFeedback('AI key saved and available models loaded.', 'success');
+      showModelStatus(`Loaded ${models.length} available Gemini models.`, 'success');
       setTimeout(() => {
         DOM.setupFeedback.classList.add('hidden');
         showScreen('screen-dashboard');
-      }, 1500);
-    } else {
-      showFeedback('Invalid access token. Please make sure the token is correct.', 'error');
+      }, 700);
+    } catch (err) {
+      showFeedback(err.message, 'error');
+    } finally {
+      setSetupLoading(false);
     }
   });
 
-  // Change API Key Button
+  DOM.btnContinueWithoutKey.addEventListener('click', () => {
+    DOM.setupFeedback.classList.add('hidden');
+    showScreen('screen-dashboard');
+  });
+
+  // AI settings button
   DOM.btnChangeKey.addEventListener('click', () => {
-    // If a quiz is running, confirm key change
     if (state.currentScreen === 'screen-quiz') {
-      if (!confirm('Are you sure you want to exit the current quiz to edit your access token?')) {
+      if (!confirm('Are you sure you want to exit the current quiz to edit AI settings?')) {
         return;
       }
       stopTimer();
     }
+    if (DOM.inputApiKey) {
+      DOM.inputApiKey.value = state.apiKey;
+    }
     showScreen('screen-setup');
+  });
+
+  DOM.selectModel.addEventListener('change', () => {
+    state.selectedModel = DOM.selectModel.value;
+    localStorage.setItem('aura_quiz_gemini_model', state.selectedModel);
+  });
+
+  DOM.btnRefreshModels.addEventListener('click', async () => {
+    if (!state.apiKey) {
+      showModelStatus('Add an AI key in AI Settings before refreshing models.', 'error');
+      return;
+    }
+    DOM.btnRefreshModels.disabled = true;
+    showModelStatus('Checking for newly available Gemini models...', 'info');
+    try {
+      await refreshGeminiModels();
+      showModelStatus(`Model list updated (${state.availableModels.length} available).`, 'success');
+    } catch (err) {
+      showModelStatus(err.message, 'error');
+    } finally {
+      DOM.btnRefreshModels.disabled = false;
+    }
   });
 
   // Topic Suggestion Chips
@@ -234,6 +276,11 @@ function setupEventListeners() {
     const style = DOM.selectStyle.value;
 
     if (!topic) return;
+    if (!state.apiKey) {
+      showFeedback('A Gemini API key is needed to generate quizzes. You can still use the app without signing in.', 'error');
+      showScreen('screen-setup');
+      return;
+    }
 
     // Transition to loading
     showScreen('screen-loading');
@@ -293,17 +340,70 @@ function setupEventListeners() {
   });
 }
 
-// --- API Validation & Setup Screen Helpers ---
-async function verifyGeminiKey(key) {
-  try {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models?key=${key}`;
-    const response = await fetch(url);
-    if (!response.ok) return false;
-    const data = await response.json();
-    return !!(data.models && data.models.length > 0);
-  } catch (err) {
-    console.error('Key verification failed', err);
-    return false;
+// --- Gemini Model Discovery & Setup Helpers ---
+async function fetchAvailableGeminiModels(key) {
+  const url = new URL('https://generativelanguage.googleapis.com/v1beta/models');
+  url.searchParams.set('key', key);
+  const response = await fetch(url);
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.error?.message || `Could not load models (HTTP ${response.status}). Check the API key and try again.`);
+  }
+
+  const models = (data.models || [])
+    .filter(model => model.supportedGenerationMethods?.includes('generateContent'))
+    .map(model => ({
+      name: model.name.replace(/^models\//, ''),
+      displayName: model.displayName || model.name.replace(/^models\//, '')
+    }))
+    .sort((a, b) => a.displayName.localeCompare(b.displayName));
+
+  if (!models.length) {
+    throw new Error('This API key has no Gemini models that support content generation.');
+  }
+  return models;
+}
+
+async function refreshGeminiModels() {
+  const models = await fetchAvailableGeminiModels(state.apiKey);
+  state.availableModels = models;
+  renderModelOptions();
+  return models;
+}
+
+function renderModelOptions() {
+  if (!DOM.selectModel) return;
+  const preferredModel = state.selectedModel;
+  DOM.selectModel.replaceChildren();
+
+  state.availableModels.forEach(model => {
+    const option = document.createElement('option');
+    option.value = model.name;
+    option.textContent = model.displayName;
+    DOM.selectModel.appendChild(option);
+  });
+
+  if (state.availableModels.length) {
+    const selectedModel = state.availableModels.find(model => model.name === preferredModel)
+      || state.availableModels.find(model => /flash/i.test(model.name))
+      || state.availableModels[0];
+    state.selectedModel = selectedModel.name;
+    DOM.selectModel.value = selectedModel.name;
+    DOM.selectModel.disabled = false;
+    localStorage.setItem('aura_quiz_gemini_model', state.selectedModel);
+  } else {
+    const option = document.createElement('option');
+    option.value = '';
+    option.textContent = state.apiKey ? 'Loading available models...' : 'Add an AI key to load models';
+    DOM.selectModel.appendChild(option);
+    DOM.selectModel.disabled = true;
+  }
+}
+
+function showModelStatus(message, type) {
+  if (DOM.modelStatus) {
+    DOM.modelStatus.textContent = message;
+    DOM.modelStatus.dataset.state = type;
   }
 }
 
@@ -322,10 +422,13 @@ function setSetupLoading(isLoading) {
     const btnText = DOM.btnSubmitKey.querySelector('span');
     if (btnText) {
       if (isLoading) {
-        btnText.textContent = 'Verifying...';
+        btnText.textContent = 'Checking key and models...';
       } else {
-        btnText.textContent = 'Save Token & Continue';
+        btnText.textContent = 'Save AI Key & Continue';
       }
+    }
+    if (DOM.btnContinueWithoutKey) {
+      DOM.btnContinueWithoutKey.disabled = isLoading;
     }
   }
 }
@@ -373,15 +476,13 @@ function stopLoaderSimulation() {
 // --- Gemini Content Fetcher ---
 async function fetchQuizFromGemini(topic, difficulty, count, style) {
   const apiKey = state.apiKey;
-
-  // Try models in order — falls back if one has quota issues
-  const MODELS = [
-    'gemini-1.5-flash',
-    'gemini-1.5-flash-latest',
-    'gemini-2.5-flash-lite',
-    'gemini-2.5-flash',
-    'gemini-2.0-flash',
-  ];
+  const models = [
+    state.selectedModel,
+    ...state.availableModels.map(model => model.name)
+  ].filter((model, index, list) => model && list.indexOf(model) === index);
+  if (!models.length) {
+    throw new Error('No Gemini models are available. Refresh the model list in AI Settings.');
+  }
 
   const systemPrompt = `You are an expert educator and quiz builder. 
 Create a customized, comprehensive quiz about "${topic}" matching the following settings:
@@ -435,12 +536,13 @@ IMPORTANT REQUIREMENT:
 
   let lastError = null;
 
-  for (const model of MODELS) {
+  for (const model of models) {
     try {
       if (DOM.loaderStatusText) {
         DOM.loaderStatusText.textContent = `Connecting via ${model}...`;
       }
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+      const url = new URL(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`);
+      url.searchParams.set('key', apiKey);
       const response = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -471,7 +573,7 @@ IMPORTANT REQUIREMENT:
     }
   }
 
-  throw lastError || new Error('All Gemini models failed. Please check your API key and quota at https://aistudio.google.com/');
+  throw lastError || new Error('All available Gemini models failed. Check your API key and quota at https://aistudio.google.com/');
 }
 
 function cleanJSONString(rawText) {
