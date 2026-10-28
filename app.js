@@ -405,6 +405,14 @@ function showModelStatus(message, type) {
     DOM.modelStatus.textContent = message;
     DOM.modelStatus.dataset.state = type;
   }
+
+  if (type === 'error' && !state.availableModels.length && DOM.selectModel) {
+    const option = document.createElement('option');
+    option.value = '';
+    option.textContent = state.apiKey ? 'Could not load models — check AI Settings' : 'Add an AI key to load models';
+    DOM.selectModel.replaceChildren(option);
+    DOM.selectModel.disabled = true;
+  }
 }
 
 function showFeedback(message, type) {
